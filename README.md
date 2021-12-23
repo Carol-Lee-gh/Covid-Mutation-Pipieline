@@ -37,7 +37,6 @@ Required arguments:
     --prefix PREFIX, -p PREFIX Hapout prefix from previous script
     --out OUT, -o OUT Output prefix
   ```
-  
     Example: python Merge_meta_and_mutrates.py -met gisaid.json -p output -out output_final
 # Reference
 
