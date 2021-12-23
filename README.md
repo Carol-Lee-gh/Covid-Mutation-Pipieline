@@ -9,7 +9,7 @@ pandas>=1.3.3
 numpy>=1.20.3
 
 **Usage
-**##To extract mutations of interest
+# To extract mutations of interest
 usage: extract_mutations.py [-h] --mutFile MUTFILE --vcfFile VCFFILE
                             [--prefix PREFIX]
 
@@ -25,7 +25,7 @@ optional arguments:
                         output prefix, default is to data/ _mut and
                         haplist.txt
                         
-**## To merge GISAID metadata with mutations                        
+# To merge GISAID metadata with mutations                        
 usage: Merge_meta_and_mutrates.py [-h] --metaFile METAFILE [--prefix PREFIX]
                                   [--out OUT]
 
