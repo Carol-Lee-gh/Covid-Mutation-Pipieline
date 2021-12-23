@@ -144,6 +144,6 @@ for m in tqdm(mutList):
             hapDict[sampleList[i]].append(snpHaps[i])
         else:
             hapDict[sampleList[i]] = [snpHaps[i]]
-with open("hapout + "_hapdict.txt","w") as f:
+with open("hapout" + "_hapdict.txt","w") as f:
     json.dump(hapDict, f)
 print("Saved categorised variants to " + hapout + "_hapdict.txt" + "\nDone")
