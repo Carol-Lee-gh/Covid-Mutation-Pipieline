@@ -60,7 +60,7 @@ with open(metaFile, 'r') as jsonFile:
             if sample['covv_collection_date'] in times2days: # check if the collection date provided is valid
                 metaInformation[sample['covv_accession_id']] = (sample['covv_location'],sample['covv_location'].split("/")[1].strip(),sample['covv_collection_date'],sample['covv_lineage'], sample['covv_gender'], sample['covv_patient_age'],sample['covv_patient_status'],times2days[sample['covv_collection_date']])
             else: # if not, record it as 0000-00-00
-                metaInformation[sample['covv_accession_id']] = (sample['covv_location'],sample['covv_location'].split("/")[1].strip(),sample['covv_collection_date'],sample['covv_lineage'], sample['covv_gender'], sample['covv_patient_age'],sample['covv_patient_status'].'0000-00-00')
+                metaInformation[sample['covv_accession_id']] = (sample['covv_location'],sample['covv_location'].split("/")[1].strip(),sample['covv_collection_date'],sample['covv_lineage'], sample['covv_gender'], sample['covv_patient_age'],sample['covv_patient_status'],'0000-00-00')
                 
 print("Reading hapdict file..." + prefix + "_hapdict.txt)")
 with open(prefix + "_hapdict.txt","r") as f:
