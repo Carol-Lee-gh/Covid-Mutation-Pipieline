@@ -38,3 +38,8 @@ optional arguments:
   --prefix PREFIX, -p PREFIX
                         Hapout prefix from previous script
   --out OUT, -o OUT     Output prefix
+  
+# Reference
+
+
+  
