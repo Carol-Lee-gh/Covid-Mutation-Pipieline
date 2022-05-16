@@ -35,12 +35,11 @@ Required arguments:
 
   required arguments:
   ```
-    --metaFile METAFILE, -met METAFILE Input metadata file (.json)
+    --metaFile METAFILE, -m METAFILE Input metadata file (.json or csv)
     --prefix PREFIX, -p PREFIX Hapout prefix from previous script
     --out OUT, -o OUT Output prefix
   ```
-  Example: python Merge_meta_and_mutrates.py -met gisaid.json -p output -out output_final
-# Reference
+  Example: python Merge_meta_and_mutrates.py -m gisaid.json -p output -out output_final
 
 
   
