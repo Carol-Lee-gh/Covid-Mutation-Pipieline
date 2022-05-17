@@ -21,7 +21,7 @@ Script for extracting variants of interest
 
 Required arguments:
 ```
---mutFile MUTFILE, -m MUTFILE mutation list (json file)
+--mutFile MUTFILE, -m MUTFILE mutation list (csv file)
 --vcfFile VCFFILE, -vcf VCFFILE input vcf file (gzipped)
 --prefix PREFIX, -out PREFIX output prefix
 ```
@@ -38,8 +38,9 @@ Required arguments:
     --metaFile METAFILE, -m METAFILE Input metadata file (.json or csv)
     --prefix PREFIX, -p PREFIX Hapout prefix from previous script
     --out OUT, -o OUT Output prefix
+    --threshold [THRESHOLD], -t [THRESHOLD] R2 Threshold to filter countries by, default is 1.2. Specify value to change
   ```
-  Example: python Merge_meta_and_mutrates.py -m gisaid.json -p output -out output_final
+  Example: python Merge_meta_and_mutrates.py -m gisaid.csv -p output -o output_final
 
 
   
