@@ -1,111 +1,121 @@
 import datetime
 import argparse
-import json
+import ujson
+import os
 from tqdm import tqdm
 import pandas as pd
-import pickle
+import csv
+import bz2
 
-parser = argparse.ArgumentParser(description = 'Merge metadata with mutation and hap output')
-parser.add_argument('--metaFile','-met', help = 'Input metadata file (.json)', required = True)
-parser.add_argument('--prefix', '-p', help = 'Hapout prefix from previous script')
-parser.add_argument('--out', '-o', help = 'Output prefix')
+minDays =14
+minSamples = 10
 
+parser = argparse.ArgumentParser(description = 'Merge metadata with mutation and hap output, ensure no duplicates present')
+parser.add_argument('--metaFile','-m', help = 'Input metadata file (.json or .csv)', required = True)
+parser.add_argument('--prefix', '-p', help = 'Hapout prefix from previous script, default is data/countryratios.csv and mutationratios.csv')
+parser.add_argument('--out', '-o', help = 'Output prefix, default is data/countryratios.csv and mutationratios.csv')
+parser.add_argument('--threshold', '-t', nargs = '?', default = 1.2, help = 'R2 Threshold to filter countries by, default is 1.2. Specify value to change')
 args = parser.parse_args()
 
 metaFile = args.metaFile
 hapout = args.prefix
+R2_threshold = args.threshold
 out = args.out
 prefix = args.prefix
 
-###Heatmap thresholds
-R2_threshold = 1.2
-R2_threshold2 = 0.1
-minDays = 14
-minSamples = 10
-####
-
-###Generate a list of valid dates
-start = datetime.datetime.strptime("2019-12-01", "%Y-%m-%d")
-#end = '2021-07-13' # manual input for testing
-end = str(datetime.date.today()) #generates todays date
-end = datetime.datetime.strptime(end, "%Y-%m-%d")
-date_generated = [start + datetime.timedelta(days=x) for x in range(0, (end-start).days)]
-time=[]
-times2days=dict()
-
+#Get column names
+with open(metaFile, 'r') as csvfile:
+    csvreader = csv.reader(csvfile)
+    list_of_column_names = []
+    for row in csvreader:
+    # loop to iterate through the rows of csv 
+        # adding the first row
+        list_of_column_names.append(row)
+ 
+        # breaking the loop after the
+        # first iteration itself
+        break
+# printing the result
+print('List of column names : ',
+      list_of_column_names[0])
+      
 ### Collecting geographic and time location
 #Dates are recorded in the format YYYY-MM-DD. These are converted into integers where Day=1 was the day the first sequence deposited into GISAID was collected.
 
+start = datetime.datetime.strptime('2019-12-30', '%Y-%m-%d')
+#end = '2021-07-13' # uncomment for manual input 
+end = str(datetime.date.today()) #generates todays date
+end = datetime.datetime.strptime(end, '%Y-%m-%d')
+date_generated = [start + datetime.timedelta(days=x) for x in range(0, (end-start).days)]
+time=[]
 for date in date_generated:
-    times=date.strftime("%Y-%m-%d")
+    times=date.strftime('%Y-%m-%d')
     time.append(times)
-#print(time)
-def days_between(d1, d2):
-    d1 = datetime.strptime(d1, "%Y-%m-%d")
-    d2 = datetime.strptime(d2, "%Y-%m-%d")
-    return abs((d2 - d1).days)
-i=1
-for times in time:
-    times2days[times] = i
-    i+=1
 
-### Store metadata as a tuple: AccessionID -> (Country, Time Collected)
-metaInformation = dict()
+dict_from_csv = {}
 
-with open(metaFile, 'r') as jsonFile:
-    print("Collecting metadata...")
-    for line in tqdm(jsonFile):
-        sample = json.loads(line)
-        if sample['covv_host'] == 'Human': # only collect human samples
-            if sample['covv_collection_date'] in times2days: # check if the collection date provided is valid
-                metaInformation[sample['covv_accession_id']] = (sample['covv_location'],sample['covv_location'].split("/")[1].strip(),sample['covv_collection_date'],sample['covv_lineage'], sample['covv_gender'], sample['covv_patient_age'],sample['covv_patient_status'],times2days[sample['covv_collection_date']])
-            else: # if not, record it as 0000-00-00
-                metaInformation[sample['covv_accession_id']] = (sample['covv_location'],sample['covv_location'].split("/")[1].strip(),sample['covv_collection_date'],sample['covv_lineage'], sample['covv_gender'], sample['covv_patient_age'],sample['covv_patient_status'],'0000-00-00')
-                
-print("Reading hapdict file..." + prefix + "_hapdict.txt)")
-with open(prefix + "_hapdict.txt","r") as f:
-    hapDict = json.load(f)
+with open(metaFile, mode='r') as inp:
+    reader = csv.reader(inp)
+    dict_from_csv = {rows[0]:rows[0:] for rows in reader}
 
+print('Reading hapdict file: ' + '../data/' + prefix + '_mutlist.txt)')
+with open('../../data/' + prefix + '_mutlist.txt', 'r') as fp:
+    mutList = ujson.load(fp)
+
+print('Reading hapdict file: ' + '../data/' + prefix + '_hapdict.txt)')
+with open('../../data/' + prefix + '_hapdict.txt','r') as f:
+    hapDict = ujson.load(f)
+    
 mutData = dict()
 
-for key in (hapDict.keys()):
-    if key in metaInformation:
-        mutData[key] = list(metaInformation[key]) + list(hapDict[key])
+for key in tqdm(hapDict.keys(), desc = 'Merging metadata and hapdict'):
+    if key in dict_from_csv:
+        mutData[key] = list(dict_from_csv[key]) + list(hapDict[key])
 
-###Ratio Analysis
-#preprocess and import
-print("Reading mutation list...(" + prefix + "_mutlist.txt)")
-with open(prefix + "_mutlist.txt", "r") as fp:
-        mutList = json.load(fp)
+mutations = list(mutList.keys())
+columnNames = list_of_column_names[0] + mutations
+data = pd.DataFrame.from_dict(mutData, orient='index', columns=columnNames)
+data = data[data['SampleCollectionDate'].isin(time)]
+data['SampleCollectionDate'] = pd.to_datetime(data['SampleCollectionDate'])
+data['Days'] = ((datetime.datetime.strptime('2019-12-30', '%Y-%m-%d') - data['SampleCollectionDate'])*-1).dt.days
+data['Country']=data['Location'].str.split('/', expand=True)[0]
+data['Country']=data['Country'].str.strip()
 
-mutations = [''.join([str(u) for u in t]) for t in mutList]
-columnNames = ["Location","Country","Date", "Lineage", "Gender", "Age", "Status","Days"] + mutations
-data = pd.DataFrame.from_dict(mutData, orient="index", columns = columnNames)
-data = data[data.Days != "0000-00-00"]
-
-# remove duplicate columns
+# remove any duplicate columns
 data = data.loc[:,~data.columns.duplicated()]
-#output collated sampleID, Country, Date, Days, mutation (categorised) to csv for ratio matrix calculation
-data.to_csv(prefix + "_ratioData.csv")
 
-#calculate ratios per country and per SNP for Snps that have been present for >14 days, can be used for downstream analyses (see Kuiper et al. 2021, https://doi.org/10.1101/2021.08.04.455042)
+path = os.getcwd()+'/data'
+
+# Check whether the specified path exists or not
+isExist = os.path.exists(path)
+
+if not isExist:
+  
+  # Create a new directory because it does not exist 
+    os.makedirs(path)
+print('Created data directory: ' + path)
+    
+#output raw counts of mutations, refs and alt alleles with sampleID, Country, Date, Days, mutation (categorised),etc to csv for ratio matrix calculation/further analyses
+data.to_csv(path +'/'+ out + 'ratioData.csv.gz',compression='gzip')
+
+#calculate ratios per country and per SNP for Snps that have been present for >14 days
 countryMutations = {}
 countries = data.Country.unique()
-print("\nStarting R2 ratio analysis...")
+print('\nStarting R2 ratio analysis...')
 for country in tqdm(countries):
     countryMutations[country] = {}
     countryData = data[data.Country.eq(country)]
     for m in mutations:
-        subset = countryData[["Days", m]]
-        subset.columns = ["Days", "Mutation"]
+        subset = countryData[['Days', m]]
+        subset.columns = ['Days', 'Mutation']
         SNP_present = subset[subset.Mutation.eq(1)]
         SNP_not_present = subset[subset.Mutation.eq(0)]
         SNPSamples = SNP_present.shape[0]
         RefSamples = SNP_not_present.shape[0]
         useOldMethod = True
         if SNPSamples > minSamples and RefSamples > minSamples:
-            SNPDays = SNP_present["Days"].astype('int').max() - SNP_present["Days"].astype('int').min() + 1 #days between first and last SNP sample
-            RefDays = SNP_not_present["Days"].astype('int').max() - SNP_not_present["Days"].astype('int').min() + 1 # days between first and last Ref sample
+            SNPDays = SNP_present['Days'].astype('int').max() - SNP_present['Days'].astype('int').min() + 1 #days between first and last SNP sample
+            RefDays = SNP_not_present['Days'].astype('int').max() - SNP_not_present['Days'].astype('int').min() + 1 # days between first and last Ref sample
             if SNPDays >= minDays and RefDays >= minDays:
                 useOldMethod = False
                 SNPRate = SNPSamples / SNPDays
@@ -114,21 +124,14 @@ for country in tqdm(countries):
                 countryMutations[country][m] = Ratio
         if useOldMethod:
             countryMutations[country][m] = 0
-print("Calculated R2 ratios")
+print('Calculated R2 ratios')
 
 # Print all countries with any ratio > threshold (default  = 1.2)
-#Simply displays all countries of interest with a high ratio for at least one of the selected SNPs. The threshold can be set at the top.
+#Simply displays all countries of interest with a high ratio for at least one of the selected SNPs. The threshold can be set in command.
+MutationRatios = pd.DataFrame.from_dict(countryMutations, orient='index')
 
-MutationRatios = pd.DataFrame.from_dict(countryMutations, orient="index")
-
-#MutationRatios.to_csv(out + 'countryratios_raw.csv')
 output = MutationRatios[(MutationRatios >= R2_threshold).any(1)] 
-output2 = MutationRatios[(MutationRatios >= R2_threshold2).any(1)] 
 
-print("writing to output...")
-output.to_csv(out + "countryRatios_" + str(R2_threshold) + ".csv")
-output2.to_csv(out + "countryRatios_" + str(R2_threshold2) + ".csv")
-
-print("Saved ratio data to " + out + "countryRatios_" + str(R2_threshold) + ".csv"
-     + "\n" + out + "countryRatios_" + str(R2_threshold2) + ".csv")
-print("Done")
+print('writing to output...')
+output.to_csv(path +'/'+ out + 'countryRatios_' + str(R2_threshold) + '.csv')
+print('Done')      
