@@ -3,6 +3,7 @@ from tqdm import tqdm
 import json
 import re
 import argparse
+from collections import defaultdict
 
 # Define inputs
 parser = argparse.ArgumentParser(description="Script for extracting variants of interest")
@@ -15,20 +16,22 @@ mutFile = args.mutFile
 vcfFile = args.vcfFile
 hapout = args.prefix
 
-mutList = list()
+mutList = defaultdict(list)
 
 # Add list of mutations in .csv into mutList()
 with open(mutFile, 'r') as file:
     print("Adding mutation list...")
-    for line in file:
-        parts = line.rstrip().split(',')
+    data = json.load(file)
+
+    for keys in data:
+        parts = data[keys].rstrip().split(',')
 
         m = ()
         for i in range(0, int(len(parts) / 3)):
             m = m + (parts[0 + (i * 3)], parts[2 + (i * 3)])
-        mutList.append(m)
+        mutList[keys].append(m)
         #print(mutList[:5])
-    print("Added mutation list")
+    print("Finished adding mutation list")
 
 with open(hapout + "_mutlist.txt", "w") as fp:
         json.dump(mutList,fp)
@@ -47,11 +50,11 @@ for i in range(1,50000):
 
 # Parse through VCF file and extract lines of interest
 vcfPosList = list()
-
-for m in mutList:
-    for i in range(0,int(len(m)/2)):
-        if not ref2actual[int(m[0+(i*2)])] in vcfPosList:
-            vcfPosList.append(ref2actual[int(m[0+(i*2)])])
+for key in mutList:
+    for m in mutList[key]:
+        for i in range(0,int(len(m)/2)):
+            if not ref2actual[int(m[0+(i*2)])] in vcfPosList:
+                vcfPosList.append(ref2actual[int(m[0+(i*2)])])
 lineDict = dict()
 
 snpLineStart = "1" # pipeline has CHROM=1, so every SNP line will start with 1
@@ -62,15 +65,15 @@ with open(vcfFile, 'r') as inFile:
         if line.startswith("#CHROM"):
             sampleID_line = line # important to store the line with all sample information so we no what order the samples are in
             lineDict['SAMPLE_ID_LINE'] = sampleID_line
-            
+
         elif line.startswith(snpLineStart):
             columns = line.split()
-                
+
             if int(columns[posColumn]) in vcfPosList: # check if this is a position we're interested in, if it is store it
                 lineDict[actual2ref[int(columns[posColumn])]] = line
                 vcfPosList.remove(int(columns[posColumn])) # once you've found it, remove from the list
     print("Extracted variants of interest")
- 
+
 def extractHap(altString, altHap):
 # this function determines how the alt variant is annotated in the vcf line
     if altString == 0:
@@ -111,39 +114,41 @@ hapList = list()
 hapDict = dict()
 
 print("Categorizing variants...")
-for m in tqdm(mutList):
-    if len(m) > 2: # if it's a combination mutation treat it differently. Here 1 = all mutants present, 0 = not all mutants present
+for key in mutList:
+    for m in tqdm(mutList[key]):
+        if len(m) > 2: # if it's a combination mutation treat it differently. Here 1 = all mutatns present, 0 = not all mutants present
 
-        snpColumns = list()
-        altHaps = list()
+            snpColumns = list()
+            altHaps = list()
 
-        for i in range(0,int(len(m)/2)):
-            mutPos = m[0+(i*2)]
-            if int(mutPos) in lineDict:
-                snpColumns.append(lineDict[int(mutPos)].split()[:9] +  [ int(x) for x in lineDict[int(mutPos)].split()[9:] ])
+            for i in range(0,int(len(m)/2)):
+                mutPos = m[0+(i*2)]
+                if int(mutPos) in lineDict:
+                    snpColumns.append(lineDict[int(mutPos)].split()[:9] +  [ int(x) for x in lineDict[int(mutPos)].split()[9:] ])
+                else:
+                    snpColumns.append([0] * len(sampleID_line))
+
+                altHaps.append(extractHap(snpColumns[i][altColumn], m[1+(i*2)]))
+
+                snpHaps = categorizeComboHaps(list(zip(*snpColumns))[9:], altHaps)
+        else: # if it's just a single SNP: 1 = mutant present, 0 = reference present, -1 = something else present (other haploytpe or ambiguous base)
+            mutPos,mutAlt = m
+            if int(mutPos) in lineDict: # check if variant was actually found at location in vcf file
+                snpColumns = lineDict[int(mutPos)].split()[:9] + [ int(x) for x in lineDict[int(mutPos)].split()[9:] ]
+            else: # if not, set all haplotypes to reference (0)
+                snpColumns = [0] * len(sampleID_line)
+
+            refHap = 0 # the reference is always haplotype 0
+            altHap = extractHap(snpColumns[altColumn], mutAlt)
+
+            snpHaps = categorizeHap(snpColumns[9:], refHap, altHap)
+
+        for i in range(0, len(sampleList)):
+            if sampleList[i] in hapDict:
+                hapDict[sampleList[i]].append(snpHaps[i])
             else:
-                snpColumns.append([0] * len(sampleID_line))
-
-            altHaps.append(extractHap(snpColumns[i][altColumn], m[1+(i*2)]))
-
-            snpHaps = categorizeComboHaps(list(zip(*snpColumns))[9:], altHaps)
-    else: # if it's just a single SNP: 1 = mutant present, 0 = reference present, -1 = something else present (other haploytpe or ambiguous base)
-        mutPos,mutAlt = m
-        if int(mutPos) in lineDict: # check if variant was actually found at location in vcf file                                             
-            snpColumns = lineDict[int(mutPos)].split()[:9] + [ int(x) for x in lineDict[int(mutPos)].split()[9:] ]
-        else: # if not, set all haplotypes to reference (0)
-            snpColumns = [0] * len(sampleID_line)
-
-        refHap = 0 # the reference is always haplotype 0
-        altHap = extractHap(snpColumns[altColumn], mutAlt)
-
-        snpHaps = categorizeHap(snpColumns[9:], refHap, altHap)
-
-    for i in range(0, len(sampleList)):
-        if sampleList[i] in hapDict:
-            hapDict[sampleList[i]].append(snpHaps[i])
-        else:
-            hapDict[sampleList[i]] = [snpHaps[i]]
+                hapDict[sampleList[i]] = [snpHaps[i]]
 with open("hapout" + "_hapdict.txt","w") as f:
     json.dump(hapDict, f)
 print("Saved categorised variants to " + hapout + "_hapdict.txt" + "\nDone")
+
