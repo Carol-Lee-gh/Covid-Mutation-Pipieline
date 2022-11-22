@@ -19,7 +19,7 @@ args = parser.parse_args()
 
 metaFile = args.metaFile
 hapout = args.prefix
-R2_threshold = args.threshold
+R2_threshold = float(args.threshold)
 out = args.out
 prefix = args.prefix
 
@@ -75,9 +75,8 @@ for key in tqdm(hapDict.keys(), desc = 'Merging metadata and hapdict'):
 mutations = list(mutList.keys())
 columnNames = list_of_column_names[0] + mutations
 data = pd.DataFrame.from_dict(mutData, orient='index', columns=columnNames)
-data = data[data['SampleCollectionDate'].isin(time)]
-data['SampleCollectionDate'] = pd.to_datetime(data['SampleCollectionDate'])
-data['Days'] = ((datetime.datetime.strptime('2019-12-30', '%Y-%m-%d') - data['SampleCollectionDate'])*-1).dt.days
+data = data[data['Date'].isin(time)]
+data['Date'] = pd.to_datetime(data['Date'])
 data['Country']=data['Location'].str.split('/', expand=True)[0]
 data['Country']=data['Country'].str.strip()
 
