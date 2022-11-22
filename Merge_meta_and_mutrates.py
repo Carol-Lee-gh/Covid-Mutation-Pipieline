@@ -54,7 +54,7 @@ for date in date_generated:
 
 dict_from_csv = {}
 
-with open(metaFile, mode='r') as inp:
+with open(metaFile, mode='r',encoding='utf-8') as inp:
     reader = csv.reader(inp)
     dict_from_csv = {rows[0]:rows[0:] for rows in reader}
 
