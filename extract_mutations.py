@@ -4,6 +4,7 @@ import json
 import re
 import argparse
 from collections import defaultdict
+import os
 
 # Define inputs
 parser = argparse.ArgumentParser(description="Script for extracting variants of interest")
@@ -17,6 +18,16 @@ vcfFile = args.vcfFile
 hapout = args.prefix
 
 mutList = defaultdict(list)
+
+path = os.getcwd()+'/output/'
+# Check whether the specified path exists or not
+isExist = os.path.exists(path)
+
+if not isExist:
+  
+  # Create a new directory because it does not exist
+    os.makedirs(path)
+print('Created data directory: ' + path)
 
 # Add list of mutations in .csv into mutList()
 with open(mutFile, 'r') as file:
@@ -33,9 +44,9 @@ with open(mutFile, 'r') as file:
         #print(mutList[:5])
     print("Finished adding mutation list")
 
-with open(hapout + "_mutlist.txt", "w") as fp:
+with open(path + hapout + "_mutlist.txt", "w") as fp:
         json.dump(mutList,fp)
-print("Saved mutlist to " + hapout + "_mutlist.txt")
+print("Saved mutlist to " + path + hapout + "_mutlist.txt")
         
 posColumn = 1  # column of the base position
 refColumn = 3  # column of the ref base identity
@@ -148,7 +159,6 @@ for key in mutList:
                 hapDict[sampleList[i]].append(snpHaps[i])
             else:
                 hapDict[sampleList[i]] = [snpHaps[i]]
-with open("hapout" + "_hapdict.txt","w") as f:
+with open(path + hapout + "_hapdict.txt","w") as f:
     json.dump(hapDict, f)
-print("Saved categorised variants to " + hapout + "_hapdict.txt" + "\nDone")
-
+print("Saved categorised variants to " + path + hapout + "_hapdict.txt" + "\nDone")
