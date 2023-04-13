@@ -58,12 +58,12 @@ with open(metaFile, mode='r',encoding='utf-8') as inp:
     reader = csv.reader(inp)
     dict_from_csv = {rows[0]:rows[0:] for rows in reader}
 
-print('Reading hapdict file: ' + '../data/' + prefix + '_mutlist.txt)')
-with open('../../data/' + prefix + '_mutlist.txt', 'r') as fp:
+print('Reading hapdict file: ' + '/data/' + prefix + '_mutlist.txt)')
+with open('/data/' + prefix + '_mutlist.txt', 'r') as fp:
     mutList = ujson.load(fp)
 
-print('Reading hapdict file: ' + '../data/' + prefix + '_hapdict.txt)')
-with open('../../data/' + prefix + '_hapdict.txt','r') as f:
+print('Reading hapdict file: ' + '/data/' + prefix + '_hapdict.txt)')
+with open('/data/' + prefix + '_hapdict.txt','r') as f:
     hapDict = ujson.load(f)
     
 mutData = dict()
