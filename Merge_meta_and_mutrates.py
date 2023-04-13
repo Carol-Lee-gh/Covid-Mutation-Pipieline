@@ -6,6 +6,7 @@ from tqdm import tqdm
 import pandas as pd
 import csv
 import bz2
+import re
 
 minDays =14
 minSamples = 10
@@ -22,6 +23,8 @@ hapout = args.prefix
 R2_threshold = float(args.threshold)
 out = args.out
 prefix = args.prefix
+
+path = os.getcwd()+ '/output/'
 
 #Get column names
 with open(metaFile, 'r') as csvfile:
@@ -48,9 +51,15 @@ end = str(datetime.date.today()) #generates todays date
 end = datetime.datetime.strptime(end, '%Y-%m-%d')
 date_generated = [start + datetime.timedelta(days=x) for x in range(0, (end-start).days)]
 time=[]
+times2days = dict()
 for date in date_generated:
-    times=date.strftime('%Y-%m-%d')
+    times = date.strftime("%Y-%m-%d")
     time.append(times)
+
+i = 1
+for times in time:
+    times2days[times] = i
+    i += 1
 
 dict_from_csv = {}
 
@@ -58,14 +67,14 @@ with open(metaFile, mode='r',encoding='utf-8') as inp:
     reader = csv.reader(inp)
     dict_from_csv = {rows[0]:rows[0:] for rows in reader}
 
-print('Reading hapdict file: ' + '/data/' + prefix + '_mutlist.txt)')
-with open('/data/' + prefix + '_mutlist.txt', 'r') as fp:
+print('Reading hapdict file: ' + path + prefix + '_mutlist.txt)')
+with open(path + prefix + '_mutlist.txt', 'r') as fp:
     mutList = ujson.load(fp)
 
-print('Reading hapdict file: ' + '/data/' + prefix + '_hapdict.txt)')
-with open('/data/' + prefix + '_hapdict.txt','r') as f:
+print('Reading hapdict file: ' + path + prefix + '_hapdict.txt)')
+with open(path + prefix + '_hapdict.txt','r') as f:
     hapDict = ujson.load(f)
-    
+
 mutData = dict()
 
 for key in tqdm(hapDict.keys(), desc = 'Merging metadata and hapdict'):
@@ -75,16 +84,18 @@ for key in tqdm(hapDict.keys(), desc = 'Merging metadata and hapdict'):
 mutations = list(mutList.keys())
 columnNames = list_of_column_names[0] + mutations
 data = pd.DataFrame.from_dict(mutData, orient='index', columns=columnNames)
+data['Days']= data['Date'].apply(lambda x: [v for k, v in times2days.items() if k in x][0])
+
 data = data[data['Date'].isin(time)]
 data['Date'] = pd.to_datetime(data['Date'])
-data['Country']=data['Location'].str.split('/', expand=True)[0]
-data['Country']=data['Country'].str.strip()
+data['Country'] = data['Location'].str.split('/').str[0]
+first_column = data.pop('Country')
+data.insert(1, 'Country', first_column)
 
 # remove any duplicate columns
 data = data.loc[:,~data.columns.duplicated()]
 
-path = os.getcwd()+'/data'
-
+'''
 # Check whether the specified path exists or not
 isExist = os.path.exists(path)
 
@@ -93,9 +104,10 @@ if not isExist:
   # Create a new directory because it does not exist 
     os.makedirs(path)
 print('Created data directory: ' + path)
-    
+'''
 #output raw counts of mutations, refs and alt alleles with sampleID, Country, Date, Days, mutation (categorised),etc to csv for ratio matrix calculation/further analyses
-data.to_csv(path +'/'+ out + 'ratioData.csv.gz',compression='gzip')
+data.set_index('Date', inplace=True)
+data.to_csv(path + out + 'ratioData.csv.gz',compression='gzip')
 
 #calculate ratios per country and per SNP for Snps that have been present for >14 days
 countryMutations = {}
@@ -132,5 +144,5 @@ MutationRatios = pd.DataFrame.from_dict(countryMutations, orient='index')
 output = MutationRatios[(MutationRatios >= R2_threshold).any(1)] 
 
 print('writing to output...')
-output.to_csv(path +'/'+ out + 'countryRatios_' + str(R2_threshold) + '.csv')
+output.to_csv(path + out + 'countryRatios_' + str(R2_threshold) + '.csv')
 print('Done')      
